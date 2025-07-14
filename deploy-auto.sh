@@ -42,10 +42,10 @@ fi
 apt update && apt install curl wget socat jq -y
 
 # ========= [Cloudflare DNS 解析] =========
-CF_API="你的_CF_API_TOKEN"
-CF_EMAIL="你的_CF_EMAIL"
+CF_API="${CF_API:?请先 export CF_API=你的Token}"
+CF_EMAIL="${CF_EMAIL:?请先 export CF_EMAIL=你的邮箱}"
 
-# 写环境变量到/root/.bashrc 保证acme.sh续签能用
+# 保证 acme.sh 自动续签能找到 token
 grep -q "CF_Token" /root/.bashrc || echo "export CF_Token='$CF_API'" >> /root/.bashrc
 grep -q "CF_Email" /root/.bashrc || echo "export CF_Email='$CF_EMAIL'" >> /root/.bashrc
 export CF_Token="$CF_API"
@@ -54,7 +54,6 @@ export CF_Email="$CF_EMAIL"
 CF_ZONE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=${BASE_DOMAIN}" \
   -H "Authorization: Bearer $CF_API" -H "Content-Type: application/json" | jq -r '.result[0].id')
 
-# 判断A记录是否存在，不存在则添加，存在则更新
 REC_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$CF_ZONE/dns_records?name=${FULL_DOMAIN}" \
   -H "Authorization: Bearer $CF_API" -H "Content-Type: application/json" | jq -r '.result[0].id')
 
@@ -90,14 +89,14 @@ curl https://get.acme.sh | sh
 # ========= [输出信息] =========
 echo -e "\n✅ 节点部署完成！"
 echo "------------------------------------------"
-echo "📍 面板地址（推荐用域名访问）：$XUI_URL"
-echo "👤 用户名：$XUI_USER"
-echo "🔑 密码：$XUI_PASS"
+echo "面板地址（IP直连）：http://${VPS_IP}:${XUI_PORT}${XUI_PATH}"
+echo "用户名：$XUI_USER"
+echo "密码：$XUI_PASS"
 echo ""
-echo "🔁 入站建议：Vmess/Vless + TCP + TLS + $FULL_DOMAIN"
-echo "🌐 出站 Socks5：$S5_IP:$S5_PORT:$S5_USER:$S5_PASS"
-echo "📄 证书路径 (CRT)：/etc/x-ui/server.crt"
-echo "🔐 证书密钥 (KEY)：/etc/x-ui/server.key"
+echo "入站建议：Vmess/Vless + TCP + TLS + $FULL_DOMAIN"
+echo "出站 Socks5：$S5_IP:$S5_PORT:$S5_USER:$S5_PASS"
+echo "证书路径 (CRT)：/etc/x-ui/server.crt"
+echo "证书密钥 (KEY)：/etc/x-ui/server.key"
 echo "------------------------------------------"
-echo "✅ BBR 加速已开启"
-echo "🔁 证书已开启自动续签，无需手动干预"
+echo "BBR 加速已开启"
+echo "证书已开启自动续签，无需手动干预"
