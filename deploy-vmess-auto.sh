@@ -36,18 +36,17 @@ bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/master/install.
 # ========= [等待写入数据库完成] =========
 sleep 2
 
-# ========= [提取信息并输出] =========
+# ========= [读取信息 - 适配新版 3x-ui 数据结构] =========
 DB="/etc/x-ui/x-ui.db"
 
-# 获取信息（x-ui v2 结构）
-XUI_PORT=$(sqlite3 $DB "SELECT panel_port FROM settings LIMIT 1;")
 XUI_USER=$(sqlite3 $DB "SELECT username FROM users LIMIT 1;")
-XUI_PASS=$(sqlite3 $DB "SELECT password FROM users LIMIT 1;")
-XUI_PATH=$(sqlite3 $DB "SELECT web_base_path FROM settings LIMIT 1;")
-
-[[ -z "$XUI_PATH" || "$XUI_PATH" == "/" ]] && XUI_PATH=""
+XUI_PASS=$(sqlite3 $DB "SELECT passwd FROM users LIMIT 1;")
+XUI_PORT="10000"
+XUI_PATH=$(sqlite3 $DB "SELECT web_path FROM settings LIMIT 1;")
+[[ "$XUI_PATH" == "/" || -z "$XUI_PATH" ]] && XUI_PATH=""
 
 XUI_URL="http://${VPS_IP}:${XUI_PORT}${XUI_PATH}"
+
 
 # ========= [输出信息] =========
 echo -e "\n✅ 节点部署完成！以下是详细信息："
