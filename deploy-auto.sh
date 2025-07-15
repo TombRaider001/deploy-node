@@ -46,16 +46,18 @@ for cmd in curl jq socat wget dig; do
 done
 
 # 参数校验
-S5_IP="$1"
-S5_PORT="$2"
-S5_USER="$3"
-S5_PASS="$4"
-
-if [[ -z "$S5_IP" || -z "$S5_PORT" || -z "$S5_USER" || -z "$S5_PASS" ]]; then
+if [[ $# -ne 1 ]]; then
   echo -e "\n${RED}❌ 参数缺失！请使用格式：${NC}"
-  echo "bash <(curl -Ls https://raw.githubusercontent.com/TombRaider001/deploy-node/main/deploy-auto.sh) [ip] [端口] [用户名] [密码]"
+  echo "bash <(curl -Ls https://raw.githubusercontent.com/TombRaider001/deploy-node/main/deploy-auto.sh) ip:端口:用户名:密码"
   exit 1
 fi
+S5_PARAM="$1"
+IFS=':' read -r S5_IP S5_PORT S5_USER S5_PASS <<< "$S5_PARAM"
+if [[ -z "$S5_IP" || -z "$S5_PORT" || -z "$S5_USER" || -z "$S5_PASS" ]]; then
+  echo -e "\n${RED}❌ 参数不完整！请用 ip:端口:用户名:密码 的格式传递！${NC}"
+  exit 1
+fi
+
 
 # 变量定义
 BASE_DOMAIN="moneylll.top"
