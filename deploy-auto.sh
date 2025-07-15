@@ -1,24 +1,26 @@
 #!/bin/bash
 
-# ====== 11. 检查是否用 bash ======
+# 检查是否用 bash
 if [ -z "$BASH_VERSION" ]; then
   echo -e "\033[31m[ERR] 请用 bash 执行本脚本！（不要用 sh 或 dash）\033[0m"
   exit 1
 fi
 
-# ====== 2.3. 日志收集，日志目录提前创建 ======
+# 日志与输出文件
 LOG_DIR="/root/xui-info"
 mkdir -p "$LOG_DIR"
-exec > >(tee -a "$LOG_DIR/last_run.log") 2>>"$LOG_DIR/error.log"
+LAST_LOG="$LOG_DIR/last_run.log"
+ERR_LOG="$LOG_DIR/error.log"
+INFO_FILE="" # 稍后赋值
 
-# ====== 颜色变量 ======
+# 颜色变量
 RED='\033[31m'
 GRN='\033[32m'
 YEL='\033[33m'
 CYN='\033[36m'
 NC='\033[0m'
 
-# ====== 5. 发行版适配 ======
+# 发行版适配
 PM=""
 if command -v apt >/dev/null 2>&1; then
   PM="apt"
@@ -43,7 +45,7 @@ for cmd in curl jq socat wget dig; do
   fi
 done
 
-# ====== 接收参数校验 ======
+# 参数校验
 S5_IP="$1"
 S5_PORT="$2"
 S5_USER="$3"
@@ -55,18 +57,22 @@ if [[ -z "$S5_IP" || -z "$S5_PORT" || -z "$S5_USER" || -z "$S5_PASS" ]]; then
   exit 1
 fi
 
-# ====== 变量定义 ======
+# 变量定义
 BASE_DOMAIN="moneylll.top"
 TIME_STR=$(date +%Y%m%d%H%M)
 SUB_DOMAIN="wdch-${TIME_STR}.wdch"
 FULL_DOMAIN="${SUB_DOMAIN}.${BASE_DOMAIN}"
+INFO_FILE="$LOG_DIR/${FULL_DOMAIN}.log"
 XUI_PORT="10000"
 VPS_IP=$(curl -s --max-time 10 ipv4.ip.sb || curl -s --max-time 10 ip.sb || hostname -I | awk '{print $1}')
 
 CF_API="${CF_API:?请先 export CF_API=你的Token}"
 CF_EMAIL="${CF_EMAIL:?请先 export CF_EMAIL=你的邮箱}"
 
-# ====== TCP/BBR 优化 ======
+# 日志重定向（全程保存）
+exec > >(tee -a "$LAST_LOG") 2>>"$ERR_LOG"
+
+# TCP/BBR 优化
 if ! grep -q "net.ipv4.tcp_rmem" /etc/sysctl.conf; then
 cat >> /etc/sysctl.conf <<EOF
 # TCP 优化
@@ -83,7 +89,7 @@ EOF
   sysctl -p
 fi
 
-# ====== Cloudflare DNS 解析 ======
+# Cloudflare DNS 解析
 echo -e "${CYN}[INFO]${NC} 添加 Cloudflare 解析..."
 grep -q "CF_Token" /root/.bashrc || echo "export CF_Token='$CF_API'" >> /root/.bashrc
 grep -q "CF_Email" /root/.bashrc || echo "export CF_Email='$CF_EMAIL'" >> /root/.bashrc
@@ -93,7 +99,6 @@ export CF_Email="$CF_EMAIL"
 CF_ZONE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=${BASE_DOMAIN}" \
   -H "Authorization: Bearer $CF_API" -H "Content-Type: application/json" | jq -r '.result[0].id')
 
-# ====== 7. 更严格API权限检测 ======
 if [[ -z "$CF_ZONE" || "$CF_ZONE" == "null" ]]; then
   echo -e "${RED}[ERR] Cloudflare Zone ID 获取失败！${NC}"
   echo -e "${RED}请检查：\n- BASE_DOMAIN 填写是否正确\n- CF_API Token 权限是否包含 Zone.DNS、Zone.Zone\n- Token 是否过期\n- Cloudflare 账号是否可用${NC}"
@@ -126,7 +131,7 @@ if [[ $ok -eq 0 ]]; then
   exit 1
 fi
 
-# ====== 3x-ui 安装/检测 ======
+# 3x-ui 安装/检测
 if [[ ! -d "/etc/x-ui" ]]; then
   echo -e "${CYN}[INFO]${NC} 安装 3x-ui 面板..."
   INSTALL_LOG=$(bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/master/install.sh) <<< "y
@@ -141,7 +146,7 @@ XUI_PASS=$(echo "$INSTALL_LOG" | grep -oP "Password:\s*\K.*" | head -1)
 XUI_PATH=$(echo "$INSTALL_LOG" | grep -oP "WebBasePath:\s*\K.*" | head -1)
 XUI_PATH="${XUI_PATH#/}"
 
-# ====== acme.sh 证书自动申请 ======
+# acme.sh 证书自动申请
 echo -e "${CYN}[INFO]${NC} 正在申请SSL证书..."
 
 curl https://get.acme.sh | sh
@@ -160,9 +165,7 @@ fi
   --key-file /etc/x-ui/server.key \
   --fullchain-file /etc/x-ui/server.crt
 
-# ====== 输出&保存信息 ======
-INFO_FILE="$LOG_DIR/${FULL_DOMAIN}.log"
-
+# 输出&保存信息
 {
   echo -e "${GRN}"
   echo "✅ 节点部署完成！"
@@ -182,4 +185,6 @@ INFO_FILE="$LOG_DIR/${FULL_DOMAIN}.log"
   echo -e "${NC}"
 } | tee "$INFO_FILE"
 
-echo -e "${GRN}[OK] 信息已保存到：$INFO_FILE${NC}"
+echo -e "${GRN}关键信息保存路径：$INFO_FILE${NC}"
+echo -e "${CYN}本次运行所有输出日志：$LAST_LOG${NC}"
+echo -e "${RED}本次运行错误日志：$ERR_LOG${NC}"
